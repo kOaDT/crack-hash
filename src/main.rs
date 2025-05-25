@@ -1,6 +1,12 @@
 use clap::Parser;
 use std::path::PathBuf;
 
+pub trait Hasher {
+    fn name(&self) -> &'static str;
+    
+    fn hash(&self, input: &str) -> String;
+}
+
 #[derive(Parser)]
 #[command(name = "hash-cracker")]
 #[command(about = "A hash cracking tool that supports multiple algorithms")]
