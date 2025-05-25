@@ -1,5 +1,5 @@
 [package]
-name = "hash-cracker"
+name = "crack-hash"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,4 +7,5 @@ edition = "2021"
 clap = { version = "4.0", features = ["derive"] }
 sha2 = "0.10"
 md5 = "0.7"
-sha1 = "0.10" 
+sha1 = "0.10"
+colored = "2.0" 

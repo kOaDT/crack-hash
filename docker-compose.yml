@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  hash-cracker:
+  crack-hash:
     build: .
-    container_name: hash-cracker-dev
+    container_name: crack-hash-dev
     volumes:
       - .:/app
       - cargo-cache:/usr/local/cargo/registry
