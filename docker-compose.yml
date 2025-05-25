@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  hash-cracker:
+    build: .
+    container_name: hash-cracker-dev
+    volumes:
+      - .:/app
+      - cargo-cache:/usr/local/cargo/registry
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    command: /bin/bash
+
+volumes:
+  cargo-cache: 

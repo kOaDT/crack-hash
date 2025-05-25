@@ -1,0 +1,10 @@
+[package]
+name = "hash-cracker"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.0", features = ["derive"] }
+sha2 = "0.10"
+md5 = "0.7"
+sha1 = "0.10" 
