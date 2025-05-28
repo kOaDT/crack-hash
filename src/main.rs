@@ -8,6 +8,8 @@ mod hash;
 mod display;
 
 use hash::md5::Md5Hasher;
+use hash::sha1::Sha1Hasher;
+use hash::sha256::Sha256Hasher;
 use display::Display;
 
 pub trait Hasher {
@@ -29,7 +31,7 @@ impl std::fmt::Display for CrackError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             CrackError::UnsupportedAlgorithm(algo) => {
-                write!(f, "Unsupported algorithm: '{}'. Supported algorithms: md5", algo)
+                write!(f, "Unsupported algorithm: '{}'. Supported algorithms: md5, sha1, sha256", algo)
             }
             CrackError::InvalidHashFormat { expected_len, actual_len } => {
                 write!(f, "Invalid hash format. Expected {} characters, got {}", expected_len, actual_len)
@@ -61,6 +63,8 @@ impl HashCracker {
     pub fn create_hasher(algorithm: &str) -> Result<Box<dyn Hasher>, CrackError> {
         match algorithm.to_lowercase().as_str() {
             "md5" => Ok(Box::new(Md5Hasher::new())),
+            "sha1" => Ok(Box::new(Sha1Hasher::new())),
+            "sha256" => Ok(Box::new(Sha256Hasher::new())),
             _ => Err(CrackError::UnsupportedAlgorithm(algorithm.to_string())),
         }
     }
@@ -68,6 +72,8 @@ impl HashCracker {
     pub fn validate_hash_format(algorithm: &str, hash: &str) -> Result<(), CrackError> {
         let expected_len = match algorithm.to_lowercase().as_str() {
             "md5" => 32,
+            "sha1" => 40,
+            "sha256" => 64,
             _ => return Err(CrackError::UnsupportedAlgorithm(algorithm.to_string())),
         };
 
@@ -106,7 +112,13 @@ impl HashCracker {
         Display::print_start_info(hasher.name(), target_hash);
 
         for (_line_num, line_result) in reader.lines().enumerate() {
-            let password = line_result?;
+            let password = match line_result {
+                Ok(line) => line,
+                Err(_) => {
+                    continue;
+                }
+            };
+            
             attempts += 1;
 
             let computed_hash = hasher.hash(&password);
@@ -139,7 +151,7 @@ impl HashCracker {
 #[command(about = "A hash cracking tool that supports multiple algorithms")]
 #[command(version = "0.1.0")]
 struct Cli {
-    #[arg(short, long, help = "Hash algorithm (supported: md5)")]
+    #[arg(short, long, help = "Hash algorithm (supported: md5, sha1, sha256)")]
     algo: String,
 
     #[arg(short = 'H', long, help = "Target hash to crack")]
