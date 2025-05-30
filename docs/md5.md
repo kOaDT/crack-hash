@@ -1,4 +1,4 @@
-## SHA1
+## MD5
 
 ```bash
 cargo run -- --algo md5 --hash 938c2cc0dcc05f2b68c4287040cfcf71 --wordlist rockyou.txt

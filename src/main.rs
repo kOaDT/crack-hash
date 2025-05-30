@@ -1,14 +1,13 @@
 use clap::Parser;
 use std::path::PathBuf;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::time::Instant;
 
 mod hash;
 mod display;
+mod cracker;
 
 use hash::get_hasher;
 use display::Display;
+use cracker::HashCracker;
 
 pub trait Hasher {
     fn name(&self) -> &'static str;
@@ -55,86 +54,6 @@ impl From<std::io::Error> for CrackError {
     }
 }
 
-pub struct HashCracker;
-
-impl HashCracker {
-    pub fn validate_hash_format(algorithm: &str, hash: &str) -> Result<(), CrackError> {
-        let expected_len = match algorithm.to_lowercase().as_str() {
-            "md5" => 32,
-            "sha1" => 40,
-            "sha256" => 64,
-            _ => return Err(CrackError::UnsupportedAlgorithm(algorithm.to_string())),
-        };
-
-        if hash.len() != expected_len {
-            return Err(CrackError::InvalidHashFormat {
-                expected_len,
-                actual_len: hash.len(),
-            });
-        }
-
-        if !hash.chars().all(|c| c.is_ascii_hexdigit()) {
-            return Err(CrackError::InvalidHashFormat {
-                expected_len,
-                actual_len: hash.len(),
-            });
-        }
-
-        Ok(())
-    }
-
-    pub fn crack_hash(
-        hasher: &dyn Hasher,
-        target_hash: &str,
-        wordlist_path: &PathBuf,
-    ) -> Result<Option<String>, CrackError> {
-        if !wordlist_path.exists() {
-            return Err(CrackError::FileNotFound(wordlist_path.display().to_string()));
-        }
-
-        let file = File::open(wordlist_path)?;
-        let reader = BufReader::new(file);
-        
-        let mut attempts = 0;
-        let start_time = Instant::now();
-
-        Display::print_start_info(hasher.name(), target_hash);
-
-        for (_line_num, line_result) in reader.lines().enumerate() {
-            let password = match line_result {
-                Ok(line) => line,
-                Err(_) => {
-                    continue;
-                }
-            };
-            
-            attempts += 1;
-
-            let computed_hash = hasher.hash(&password);
-            
-            if attempts % 10000 == 0 {
-                Display::print_progress(attempts);
-            }
-
-            if computed_hash.eq_ignore_ascii_case(target_hash) {
-                let elapsed = start_time.elapsed();
-                Display::print_success(&password, attempts, elapsed);
-                
-                return Ok(Some(password));
-            }
-        }
-
-        if attempts == 0 {
-            return Err(CrackError::EmptyWordlist);
-        }
-
-        let elapsed = start_time.elapsed();
-        Display::print_failure(attempts, elapsed);
-        
-        Ok(None)
-    }
-}
-
 #[derive(Parser)]
 #[command(name = "crack-hash")]
 #[command(about = "A hash cracking tool that supports multiple algorithms")]
@@ -155,7 +74,6 @@ fn main() {
 
     Display::print_banner();
     
-    // Validate and create hasher
     let hasher = match get_hasher(&cli.algo) {
         Some(hasher) => hasher,
         None => {
@@ -165,14 +83,14 @@ fn main() {
         }
     };
 
-    // Validate hash format
     if let Err(e) = HashCracker::validate_hash_format(&cli.algo, &cli.hash) {
         Display::print_error(&e.to_string());
         std::process::exit(1);
     }
 
-    // Attempt to crack the hash
-    match HashCracker::crack_hash(hasher.as_ref(), &cli.hash, &cli.wordlist) {
+    let cracker = HashCracker::new(hasher, cli.hash, cli.wordlist);
+    
+    match cracker.crack() {
         Ok(Some(_password)) => {
             std::process::exit(0);
         }
