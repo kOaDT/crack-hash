@@ -7,9 +7,7 @@ use std::time::Instant;
 mod hash;
 mod display;
 
-use hash::md5::Md5Hasher;
-use hash::sha1::Sha1Hasher;
-use hash::sha256::Sha256Hasher;
+use hash::get_hasher;
 use display::Display;
 
 pub trait Hasher {
@@ -60,15 +58,6 @@ impl From<std::io::Error> for CrackError {
 pub struct HashCracker;
 
 impl HashCracker {
-    pub fn create_hasher(algorithm: &str) -> Result<Box<dyn Hasher>, CrackError> {
-        match algorithm.to_lowercase().as_str() {
-            "md5" => Ok(Box::new(Md5Hasher::new())),
-            "sha1" => Ok(Box::new(Sha1Hasher::new())),
-            "sha256" => Ok(Box::new(Sha256Hasher::new())),
-            _ => Err(CrackError::UnsupportedAlgorithm(algorithm.to_string())),
-        }
-    }
-
     pub fn validate_hash_format(algorithm: &str, hash: &str) -> Result<(), CrackError> {
         let expected_len = match algorithm.to_lowercase().as_str() {
             "md5" => 32,
@@ -167,10 +156,11 @@ fn main() {
     Display::print_banner();
     
     // Validate and create hasher
-    let hasher = match HashCracker::create_hasher(&cli.algo) {
-        Ok(hasher) => hasher,
-        Err(e) => {
-            Display::print_error(&e.to_string());
+    let hasher = match get_hasher(&cli.algo) {
+        Some(hasher) => hasher,
+        None => {
+            let error = CrackError::UnsupportedAlgorithm(cli.algo.clone());
+            Display::print_error(&error.to_string());
             std::process::exit(1);
         }
     };
