@@ -1,5 +1,4 @@
 use colored::*;
-use std::io::Write;
 
 pub struct Display;
 
@@ -17,12 +16,6 @@ impl Display {
         println!("{}", format!("Algorithm: {}", algorithm.bright_white().bold()));
         println!("{}", format!("Target: {}", target_hash.bright_white().bold()));
         println!();
-    }
-
-    pub fn print_progress(attempts: u64) {
-        let progress_msg = format!("🔍 Tried {} passwords...", attempts.to_string().bright_white().bold());
-        print!("\r{}", progress_msg.bright_cyan());
-        std::io::stdout().flush().unwrap();
     }
 
     pub fn print_success(password: &str, attempts: u64, elapsed: std::time::Duration) {

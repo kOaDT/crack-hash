@@ -4,6 +4,7 @@ use std::io::{BufRead, BufReader};
 use std::time::Instant;
 use std::sync::{Arc, Mutex};
 use rayon::prelude::*;
+use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::{Hasher, CrackError};
 use crate::display::Display;
@@ -29,10 +30,6 @@ impl CrackingStats {
 
     fn increment(&mut self) {
         self.attempts += 1;
-    }
-
-    fn should_show_progress(&self) -> bool {
-        self.attempts % 10000 == 0
     }
 
     fn elapsed(&self) -> std::time::Duration {
@@ -64,8 +61,14 @@ impl HashCracker {
         let hasher = Arc::new(self.hasher.as_ref());
         let target_hash = Arc::new(self.target_hash.clone());
 
-        let result = self.attempt_crack_parallel(&words, &hasher, &target_hash, &stats);
+        let total_words = words.len() as u64;
+        let progress_bar = self.create_progress_bar(total_words);
+        let progress_bar = Arc::new(progress_bar);
 
+        let result = self.attempt_crack_parallel(&words, &hasher, &target_hash, &stats, &progress_bar);
+
+        progress_bar.finish_with_message("Cracking completed");
+        
         let stats = stats.lock().unwrap();
         match result {
             Some(password) => {
@@ -77,6 +80,19 @@ impl HashCracker {
                 Ok(None)
             }
         }
+    }
+
+    fn create_progress_bar(&self, total_words: u64) -> ProgressBar {
+        let pb = ProgressBar::new(total_words);
+        
+        let style = ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {per_sec}")
+            .unwrap()
+            .progress_chars("#>-");
+        
+        pb.set_style(style);
+        pb.set_message("Starting hash cracking...");
+        pb
     }
 
     fn validate_wordlist(&self) -> Result<(), CrackError> {
@@ -111,6 +127,7 @@ impl HashCracker {
         hasher: &Arc<&dyn Hasher>,
         target_hash: &Arc<String>,
         stats: &Arc<Mutex<CrackingStats>>,
+        progress_bar: &Arc<ProgressBar>,
     ) -> Option<String> {
         let chunk_size = (words.len() / rayon::current_num_threads()).max(1);
         
@@ -122,9 +139,7 @@ impl HashCracker {
                         let mut stats = stats.lock().unwrap();
                         stats.increment();
                         
-                        if stats.should_show_progress() {
-                            Display::print_progress(stats.attempts);
-                        }
+                        progress_bar.set_position(stats.attempts);
                     }
 
                     if self.check_password_match_parallel(password, hasher, target_hash) {
