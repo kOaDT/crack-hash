@@ -9,7 +9,7 @@ use hash::get_hasher;
 use display::Display;
 use cracker::HashCracker;
 
-pub trait Hasher {
+pub trait Hasher: Send + Sync {
     fn name(&self) -> &'static str;
     
     fn hash(&self, input: &str) -> String;

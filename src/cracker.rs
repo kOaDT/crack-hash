@@ -2,6 +2,8 @@ use std::path::PathBuf;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::time::Instant;
+use std::sync::{Arc, Mutex};
+use rayon::prelude::*;
 
 use crate::{Hasher, CrackError};
 use crate::display::Display;
@@ -52,21 +54,27 @@ impl HashCracker {
         
         Display::print_start_info(self.hasher.name(), &self.target_hash);
         
-        let mut stats = CrackingStats::new();
-        let reader = self.create_wordlist_reader()?;
+        let words = self.load_wordlist()?;
+        
+        if words.is_empty() {
+            return Err(CrackError::EmptyWordlist);
+        }
 
-        match self.attempt_crack(reader, &mut stats) {
+        let stats = Arc::new(Mutex::new(CrackingStats::new()));
+        let hasher = Arc::new(self.hasher.as_ref());
+        let target_hash = Arc::new(self.target_hash.clone());
+
+        let result = self.attempt_crack_parallel(&words, &hasher, &target_hash, &stats);
+
+        let stats = stats.lock().unwrap();
+        match result {
             Some(password) => {
                 Display::print_success(&password, stats.attempts, stats.elapsed());
                 Ok(Some(password))
             }
             None => {
-                if stats.attempts == 0 {
-                    Err(CrackError::EmptyWordlist)
-                } else {
-                    Display::print_failure(stats.attempts, stats.elapsed());
-                    Ok(None)
-                }
+                Display::print_failure(stats.attempts, stats.elapsed());
+                Ok(None)
             }
         }
     }
@@ -78,34 +86,63 @@ impl HashCracker {
         Ok(())
     }
 
-    fn create_wordlist_reader(&self) -> Result<BufReader<File>, CrackError> {
+    fn load_wordlist(&self) -> Result<Vec<String>, CrackError> {
         let file = File::open(&self.wordlist_path)?;
-        Ok(BufReader::new(file))
-    }
-
-    fn attempt_crack(&self, reader: BufReader<File>, stats: &mut CrackingStats) -> Option<String> {
+        let reader = BufReader::new(file);
+        
+        let mut words = Vec::new();
         for line_result in reader.lines() {
             let password = match line_result {
                 Ok(line) => line.trim().to_string(),
                 Err(_) => continue,
             };
-
-            stats.increment();
-
-            if stats.should_show_progress() {
-                Display::print_progress(stats.attempts);
-            }
-
-            if self.check_password_match(&password) {
-                return Some(password);
+            
+            if !password.is_empty() {
+                words.push(password);
             }
         }
-        None
+        
+        Ok(words)
     }
 
-    fn check_password_match(&self, password: &str) -> bool {
-        let computed_hash = self.hasher.hash(password);
-        computed_hash.eq_ignore_ascii_case(&self.target_hash)
+    fn attempt_crack_parallel(
+        &self,
+        words: &[String],
+        hasher: &Arc<&dyn Hasher>,
+        target_hash: &Arc<String>,
+        stats: &Arc<Mutex<CrackingStats>>,
+    ) -> Option<String> {
+        let chunk_size = (words.len() / rayon::current_num_threads()).max(1);
+        
+        words
+            .par_chunks(chunk_size)
+            .find_map_any(|chunk| {
+                for password in chunk {
+                    {
+                        let mut stats = stats.lock().unwrap();
+                        stats.increment();
+                        
+                        if stats.should_show_progress() {
+                            Display::print_progress(stats.attempts);
+                        }
+                    }
+
+                    if self.check_password_match_parallel(password, hasher, target_hash) {
+                        return Some(password.clone());
+                    }
+                }
+                None
+            })
+    }
+
+    fn check_password_match_parallel(
+        &self,
+        password: &str,
+        hasher: &Arc<&dyn Hasher>,
+        target_hash: &Arc<String>,
+    ) -> bool {
+        let computed_hash = hasher.hash(password);
+        computed_hash.eq_ignore_ascii_case(target_hash)
     }
 
     pub fn validate_hash_format(algorithm: &str, hash: &str) -> Result<(), CrackError> {
