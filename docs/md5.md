@@ -5,7 +5,7 @@ cargo run -- --algo md5 --hash 938c2cc0dcc05f2b68c4287040cfcf71 --wordlist rocky
 ```
 
 ```bash
-🔓 Crack Hash v1.0.0 🔓
+🔓 Crack Hash v1.0.1 🔓
 ═════════════════════════
 
 STARTING HASH CRACKING...

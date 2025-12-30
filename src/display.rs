@@ -33,7 +33,7 @@ impl Display {
         println!("{}", "--------------------------------".bright_white().bold());
         println!("{}", format!("Attempts: {}", attempts.to_string().bright_white().bold()));
         println!("{}", format!("Time: {:.2?}", elapsed).bright_white());
-        println!("{}", format!("Rate: {:.0} h/s", attempts as f64 / elapsed.as_secs_f64()).bright_white());
+        println!("{}", format!("Rate: {:.0} h/s", Self::calculate_rate(attempts, elapsed)).bright_white());
         println!("{}", "--------------------------------".bright_white().bold());
     }
 
@@ -45,10 +45,19 @@ impl Display {
                 
         println!("{}", format!("Total attempts: {}", attempts.to_string().bright_white().bold()));
         println!("{}", format!("Time elapsed: {:.2?}", elapsed).bright_white());
-        println!("{}", format!("Hash rate: {:.0} h/s", attempts as f64 / elapsed.as_secs_f64()).bright_white());
+        println!("{}", format!("Hash rate: {:.0} h/s", Self::calculate_rate(attempts, elapsed)).bright_white());
         
         println!();
         println!("{}", "💡 Try a different wordlist or check if the hash is correct.".bright_yellow());
+    }
+
+    fn calculate_rate(attempts: u64, elapsed: std::time::Duration) -> f64 {
+        let secs = elapsed.as_secs_f64();
+        if secs > 0.0 {
+            attempts as f64 / secs
+        } else {
+            attempts as f64
+        }
     }
 
     pub fn print_error(message: &str) {

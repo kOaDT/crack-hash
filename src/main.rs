@@ -18,7 +18,8 @@ pub trait Hasher: Send + Sync {
 #[derive(Debug)]
 pub enum CrackError {
     UnsupportedAlgorithm(String),
-    InvalidHashFormat { expected_len: usize, actual_len: usize },
+    InvalidHashLength { expected_len: usize, actual_len: usize },
+    InvalidHashCharacters,
     FileNotFound(String),
     IoError(std::io::Error),
     EmptyWordlist,
@@ -30,8 +31,11 @@ impl std::fmt::Display for CrackError {
             CrackError::UnsupportedAlgorithm(algo) => {
                 write!(f, "Unsupported algorithm: '{}'. Supported algorithms: md5, sha1, sha256", algo)
             }
-            CrackError::InvalidHashFormat { expected_len, actual_len } => {
-                write!(f, "Invalid hash format. Expected {} characters, got {}", expected_len, actual_len)
+            CrackError::InvalidHashLength { expected_len, actual_len } => {
+                write!(f, "Invalid hash length. Expected {} characters, got {}", expected_len, actual_len)
+            }
+            CrackError::InvalidHashCharacters => {
+                write!(f, "Invalid hash format. Hash must contain only hexadecimal characters (0-9, a-f)")
             }
             CrackError::FileNotFound(path) => {
                 write!(f, "Wordlist file not found: {}", path)

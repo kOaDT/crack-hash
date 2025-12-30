@@ -5,7 +5,7 @@ cargo run -- --algo sha1 --hash 2aae6c35c94fcfb415dbe95f408b9ce91ee846ed --wordl
 ```
 
 ```bash
-🔓 Crack Hash v1.0.0 🔓
+🔓 Crack Hash v1.0.1 🔓
 ═════════════════════════
 
 STARTING HASH CRACKING...

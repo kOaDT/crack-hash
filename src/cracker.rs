@@ -2,7 +2,8 @@ use std::path::PathBuf;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::time::Instant;
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use rayon::prelude::*;
 use indicatif::{ProgressBar, ProgressStyle};
 
@@ -16,20 +17,24 @@ pub struct HashCracker {
 }
 
 pub struct CrackingStats {
-    pub attempts: u64,
+    pub attempts: AtomicU64,
     pub start_time: Instant,
 }
 
 impl CrackingStats {
     fn new() -> Self {
         Self {
-            attempts: 0,
+            attempts: AtomicU64::new(0),
             start_time: Instant::now(),
         }
     }
 
-    fn increment(&mut self) {
-        self.attempts += 1;
+    fn add(&self, count: u64) {
+        self.attempts.fetch_add(count, Ordering::Relaxed);
+    }
+
+    fn get_attempts(&self) -> u64 {
+        self.attempts.load(Ordering::Relaxed)
     }
 
     fn elapsed(&self) -> std::time::Duration {
@@ -57,26 +62,27 @@ impl HashCracker {
             return Err(CrackError::EmptyWordlist);
         }
 
-        let stats = Arc::new(Mutex::new(CrackingStats::new()));
-        let hasher = Arc::new(self.hasher.as_ref());
-        let target_hash = Arc::new(self.target_hash.clone());
+        let stats = Arc::new(CrackingStats::new());
+        let target_hash = &self.target_hash;
 
         let total_words = words.len() as u64;
         let progress_bar = self.create_progress_bar(total_words);
         let progress_bar = Arc::new(progress_bar);
 
-        let result = self.attempt_crack_parallel(&words, &hasher, &target_hash, &stats, &progress_bar);
+        let result = self.attempt_crack_parallel(&words, target_hash, &stats, &progress_bar);
 
         progress_bar.finish_with_message("Cracking completed");
         
-        let stats = stats.lock().unwrap();
+        let attempts = stats.get_attempts();
+        let elapsed = stats.elapsed();
+        
         match result {
             Some(plaintext) => {
-                Display::print_success(&plaintext, stats.attempts, stats.elapsed());
+                Display::print_success(&plaintext, attempts, elapsed);
                 Ok(Some(plaintext))
             }
             None => {
-                Display::print_failure(stats.attempts, stats.elapsed());
+                Display::print_failure(attempts, elapsed);
                 Ok(None)
             }
         }
@@ -124,40 +130,43 @@ impl HashCracker {
     fn attempt_crack_parallel(
         &self,
         words: &[String],
-        hasher: &Arc<&dyn Hasher>,
-        target_hash: &Arc<String>,
-        stats: &Arc<Mutex<CrackingStats>>,
+        target_hash: &str,
+        stats: &Arc<CrackingStats>,
         progress_bar: &Arc<ProgressBar>,
     ) -> Option<String> {
+        const UPDATE_INTERVAL: u64 = 1000;
+        
         let chunk_size = (words.len() / rayon::current_num_threads()).max(1);
+        let hasher = self.hasher.as_ref();
         
         words
             .par_chunks(chunk_size)
             .find_map_any(|chunk| {
+                let mut local_count: u64 = 0;
+                
                 for word in chunk {
-                    {
-                        let mut stats = stats.lock().unwrap();
-                        stats.increment();
-                        
-                        progress_bar.set_position(stats.attempts);
-                    }
-
-                    if self.check_match(word, hasher, target_hash) {
+                    let computed_hash = hasher.hash(word);
+                    if computed_hash.eq_ignore_ascii_case(target_hash) {
+                        stats.add(local_count + 1);
+                        progress_bar.set_position(stats.get_attempts());
                         return Some(word.clone());
                     }
+                    
+                    local_count += 1;
+                    if local_count % UPDATE_INTERVAL == 0 {
+                        stats.add(UPDATE_INTERVAL);
+                        progress_bar.set_position(stats.get_attempts());
+                    }
                 }
+                
+                let remaining = local_count % UPDATE_INTERVAL;
+                if remaining > 0 {
+                    stats.add(remaining);
+                    progress_bar.set_position(stats.get_attempts());
+                }
+                
                 None
             })
-    }
-
-    fn check_match(
-        &self,
-        candidate: &str,
-        hasher: &Arc<&dyn Hasher>,
-        target_hash: &Arc<String>,
-    ) -> bool {
-        let computed_hash = hasher.hash(candidate);
-        computed_hash.eq_ignore_ascii_case(target_hash)
     }
 
     pub fn validate_hash_format(algorithm: &str, hash: &str) -> Result<(), CrackError> {
@@ -169,17 +178,14 @@ impl HashCracker {
         };
 
         if hash.len() != expected_len {
-            return Err(CrackError::InvalidHashFormat {
+            return Err(CrackError::InvalidHashLength {
                 expected_len,
                 actual_len: hash.len(),
             });
         }
 
         if !hash.chars().all(|c| c.is_ascii_hexdigit()) {
-            return Err(CrackError::InvalidHashFormat {
-                expected_len,
-                actual_len: hash.len(),
-            });
+            return Err(CrackError::InvalidHashCharacters);
         }
 
         Ok(())
