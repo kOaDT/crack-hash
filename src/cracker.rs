@@ -71,9 +71,9 @@ impl HashCracker {
         
         let stats = stats.lock().unwrap();
         match result {
-            Some(password) => {
-                Display::print_success(&password, stats.attempts, stats.elapsed());
-                Ok(Some(password))
+            Some(plaintext) => {
+                Display::print_success(&plaintext, stats.attempts, stats.elapsed());
+                Ok(Some(plaintext))
             }
             None => {
                 Display::print_failure(stats.attempts, stats.elapsed());
@@ -108,13 +108,13 @@ impl HashCracker {
         
         let mut words = Vec::new();
         for line_result in reader.lines() {
-            let password = match line_result {
+            let word = match line_result {
                 Ok(line) => line.trim().to_string(),
                 Err(_) => continue,
             };
             
-            if !password.is_empty() {
-                words.push(password);
+            if !word.is_empty() {
+                words.push(word);
             }
         }
         
@@ -134,7 +134,7 @@ impl HashCracker {
         words
             .par_chunks(chunk_size)
             .find_map_any(|chunk| {
-                for password in chunk {
+                for word in chunk {
                     {
                         let mut stats = stats.lock().unwrap();
                         stats.increment();
@@ -142,21 +142,21 @@ impl HashCracker {
                         progress_bar.set_position(stats.attempts);
                     }
 
-                    if self.check_password_match_parallel(password, hasher, target_hash) {
-                        return Some(password.clone());
+                    if self.check_match(word, hasher, target_hash) {
+                        return Some(word.clone());
                     }
                 }
                 None
             })
     }
 
-    fn check_password_match_parallel(
+    fn check_match(
         &self,
-        password: &str,
+        candidate: &str,
         hasher: &Arc<&dyn Hasher>,
         target_hash: &Arc<String>,
     ) -> bool {
-        let computed_hash = hasher.hash(password);
+        let computed_hash = hasher.hash(candidate);
         computed_hash.eq_ignore_ascii_case(target_hash)
     }
 

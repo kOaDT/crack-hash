@@ -91,7 +91,7 @@ fn main() {
     let cracker = HashCracker::new(hasher, cli.hash, cli.wordlist);
     
     match cracker.crack() {
-        Ok(Some(_password)) => {
+        Ok(Some(_plaintext)) => {
             std::process::exit(0);
         }
         Ok(None) => {

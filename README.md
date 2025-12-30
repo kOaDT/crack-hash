@@ -2,27 +2,53 @@
 
 A hash cracking tool.
 
-## Usage with Docker
+## Usage (Local)
+
+### Prerequisites
+
+- [Rust](https://www.rust-lang.org/tools/install) (1.70+)
+
+### Build and run
+
+```bash
+cargo build --release
+./target/release/crack-hash --help
+```
+
+Or directly with Cargo:
+
+```bash
+cargo run --release -- --help
+```
+
+---
+
+## Usage (Docker)
+
+If you prefer using Docker:
 
 ### 1. Build the container
+
 ```bash
 docker compose build
 ```
 
 ### 2. Launch the container
+
 ```bash
 docker compose up -d
 docker compose exec crack-hash bash
 ```
 
 ### 3. Compile and run
+
 ```bash
 # Inside the container
 cargo build
 cargo run -- --help
 ```
 
-### 4. Usage example
+## Usage examples
 
 - [MD5](/docs/md5.md)
 - [SHA1](/docs/sha1.md)

@@ -5,7 +5,7 @@ cargo run -- --algo sha1 --hash 2aae6c35c94fcfb415dbe95f408b9ce91ee846ed --wordl
 ```
 
 ```bash
-🔓 Crack Hash v0.1.0 🔓
+🔓 Crack Hash v1.0.0 🔓
 ═════════════════════════
 
 STARTING HASH CRACKING...
@@ -13,10 +13,10 @@ STARTING HASH CRACKING...
 Algorithm: SHA1
 Target: 2aae6c35c94fcfb415dbe95f408b9ce91ee846ed
 
-🔍 Tried 930000 passwords...
-PASSWORD FOUND!
+🔍 Tried 930000 plaintexts...
+PLAINTEXT FOUND!
 ==================
-PASSWORD: hello world    
+PLAINTEXT: hello world    
 ==================
 
 --------------------------------

@@ -4,7 +4,7 @@ pub struct Display;
 
 impl Display {
     pub fn print_banner() {
-        println!("{}", "🔓 Crack Hash v0.1.0 🔓".bright_yellow().bold());
+        println!("{}", "🔓 Crack Hash v1.0.0 🔓".bright_yellow().bold());
         println!("{}", "═════════════════════════".bright_yellow());
         println!();
     }
@@ -18,15 +18,15 @@ impl Display {
         println!();
     }
 
-    pub fn print_success(password: &str, attempts: u64, elapsed: std::time::Duration) {
+    pub fn print_success(plaintext: &str, attempts: u64, elapsed: std::time::Duration) {
         println!();
-        println!("{}", "PASSWORD FOUND!".bright_green().bold().on_black());
+        println!("{}", "PLAINTEXT FOUND!".bright_green().bold().on_black());
 
-        let password_len = password.len() + 15;
-        let eq_count = (password_len + 10) / 2;
+        let plaintext_len = plaintext.len() + 15;
+        let eq_count = (plaintext_len + 10) / 2;
         
         println!("{}", "=".repeat(eq_count).bright_white());
-        println!("{}", format!("PASSWORD: {}    ", password.bright_yellow().bold()));
+        println!("{}", format!("PLAINTEXT: {}    ", plaintext.bright_yellow().bold()));
         println!("{}", "=".repeat(eq_count).bright_white());
         println!();
         
@@ -40,7 +40,7 @@ impl Display {
     pub fn print_failure(attempts: u64, elapsed: std::time::Duration) {
         println!();
         
-        println!("{}", "❌ PASSWORD NOT FOUND".bright_red().bold());
+        println!("{}", "❌ PLAINTEXT NOT FOUND".bright_red().bold());
         println!();
                 
         println!("{}", format!("Total attempts: {}", attempts.to_string().bright_white().bold()));
