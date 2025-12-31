@@ -1,11 +1,11 @@
 ## SHA1
 
 ```bash
-cargo run -- --algo sha1 --hash 2aae6c35c94fcfb415dbe95f408b9ce91ee846ed --wordlist rockyou.txt
+cargo run -- single --algo sha1 --hash 2aae6c35c94fcfb415dbe95f408b9ce91ee846ed --wordlist rockyou.txt
 ```
 
 ```bash
-🔓 Crack Hash v1.0.1 🔓
+🔓 Crack Hash v1.1.0 🔓
 ═════════════════════════
 
 STARTING HASH CRACKING...

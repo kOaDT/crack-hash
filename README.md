@@ -1,8 +1,21 @@
 # Crack Hash
 
+[![Rust](https://img.shields.io/badge/Rust-1.70%2B-orange?logo=rust)](https://www.rust-lang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/version-1.1.0-green.svg)](https://github.com/lemusic/hash-cracker/releases)
+[![GitHub stars](https://img.shields.io/github/stars/kOaDT/crack-hash?style=social)](https://github.com/kOaDT/crack-hash)
+
 A fast, multi-threaded hash cracking tool written in Rust. This tool performs dictionary attacks against hashed passwords.
 
 ![Crack Hash CLI](screen.png)
+
+## Features
+
+- **Single hash cracking**: Crack individual hashes
+- **Batch TXT processing**: Crack multiple hashes from a text file (one hash per line)
+- **Batch CSV processing**: Crack hashes from CSV files with customizable column mapping
+- **Multi-threaded**: Leverages all CPU cores for faster cracking
+- **Multiple algorithms**: Supports MD5, SHA1, and SHA256
 
 ## Usage (Local)
 
@@ -50,7 +63,17 @@ cargo build
 cargo run -- --help
 ```
 
-## CLI Arguments
+## Commands
+
+> **Note:** All examples below use `cargo run --`. After building with `cargo build --release`, you can use `./target/release/crack-hash` directly.
+
+### Single Hash Mode
+
+Crack a single hash:
+
+```bash
+cargo run -- single -a <ALGORITHM> -H <HASH> -w <WORDLIST>
+```
 
 | Argument | Short | Description |
 |----------|-------|-------------|
@@ -58,7 +81,70 @@ cargo run -- --help
 | `--hash` | `-H` | Target hash to crack |
 | `--wordlist` | `-w` | Path to the wordlist file |
 
-## Usage examples
+**Example:**
+
+```bash
+cargo run -- single -a md5 -H 5d41402abc4b2a76b9719d911017c592 -w wordlist.txt
+```
+
+### Batch TXT Mode
+
+Crack multiple hashes from a text file (one hash per line):
+
+```bash
+cargo run -- batch-txt -a <ALGORITHM> -i <INPUT_FILE> -o <OUTPUT_FILE> -w <WORDLIST>
+```
+
+| Argument | Short | Description |
+|----------|-------|-------------|
+| `--algo` | `-a` | Hash algorithm (md5, sha1, sha256) |
+| `--input` | `-i` | Input file containing hashes (one per line) |
+| `--output` | `-o` | Output file for results |
+| `--wordlist` | `-w` | Path to the wordlist file |
+
+**Example:**
+
+```bash
+cargo run -- batch-txt -a md5 -i hashes.txt -o results.txt -w wordlist.txt
+```
+
+### Batch CSV Mode
+
+Crack hashes from a CSV file with customizable format:
+
+```bash
+cargo run -- batch-csv -a <ALGORITHM> -i <INPUT_CSV> -o <OUTPUT_CSV> -w <WORDLIST> [OPTIONS]
+```
+
+| Argument | Short | Description | Default |
+|----------|-------|-------------|---------|
+| `--algo` | `-a` | Hash algorithm (md5, sha1, sha256) | - |
+| `--input` | `-i` | Input CSV file | - |
+| `--output` | `-o` | Output CSV file | - |
+| `--wordlist` | `-w` | Path to the wordlist file | - |
+| `--hash-column` | `-c` | Column index containing the hash (0-based) | 0 |
+| `--delimiter` | `-d` | CSV delimiter character | , |
+| `--no-header` | - | Disable header row parsing (headers enabled by default) | false |
+
+**Example with header:**
+
+```bash
+cargo run -- batch-csv -a sha256 -i users.csv -o cracked.csv -w wordlist.txt -c 2
+```
+
+**Example without header:**
+
+```bash
+cargo run -- batch-csv -a md5 -i data.csv -o results.csv -w wordlist.txt -c 1 --no-header
+```
+
+**Example with custom delimiter (semicolon):**
+
+```bash
+cargo run -- batch-csv -a md5 -i data.csv -o results.csv -w wordlist.txt -d ";"
+```
+
+## Algorithm Examples
 
 - [MD5](/docs/md5.md)
 - [SHA1](/docs/sha1.md)

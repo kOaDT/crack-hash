@@ -1,11 +1,11 @@
 ## MD5
 
 ```bash
-cargo run -- --algo md5 --hash 938c2cc0dcc05f2b68c4287040cfcf71 --wordlist rockyou.txt
+cargo run -- single --algo md5 --hash 938c2cc0dcc05f2b68c4287040cfcf71 --wordlist rockyou.txt
 ```
 
 ```bash
-🔓 Crack Hash v1.0.1 🔓
+🔓 Crack Hash v1.1.0 🔓
 ═════════════════════════
 
 STARTING HASH CRACKING...

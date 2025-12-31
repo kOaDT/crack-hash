@@ -1,10 +1,14 @@
+use std::path::PathBuf;
+
 use colored::*;
+
+use crate::batch::BatchResult;
 
 pub struct Display;
 
 impl Display {
     pub fn print_banner() {
-        println!("{}", "🔓 Crack Hash v1.0.0 🔓".bright_yellow().bold());
+        println!("{}", "🔓 Crack Hash v1.1.0 🔓".bright_yellow().bold());
         println!("{}", "═════════════════════════".bright_yellow());
         println!();
     }
@@ -65,5 +69,95 @@ impl Display {
         println!("{}", "ERROR".bright_red().bold());
         println!("{}", format!("{}", message).bright_red());
         println!();
+    }
+
+    pub fn print_batch_start_optimized(mode: &str, total: usize, unique: usize, skipped: usize, algorithm: &str) {
+        println!(
+            "{}",
+            format!("BATCH MODE ({})", mode).bright_white().bold()
+        );
+        println!(
+            "{}",
+            format!("Algorithm: {}", algorithm.to_uppercase().bright_cyan().bold())
+        );
+        if skipped > 0 {
+            println!(
+                "{}",
+                format!(
+                    "Hashes: {} total, {} valid unique, {} skipped (invalid format)",
+                    total.to_string().bright_white().bold(),
+                    unique.to_string().bright_green().bold(),
+                    skipped.to_string().bright_yellow()
+                )
+            );
+        } else {
+            println!(
+                "{}",
+                format!(
+                    "Hashes: {} total, {} unique",
+                    total.to_string().bright_white().bold(),
+                    unique.to_string().bright_green().bold()
+                )
+            );
+        }
+        println!();
+    }
+
+    pub fn print_batch_match(hash: &str, plaintext: &str) {
+        println!(
+            "{}",
+            format!("✓ {} → {}", hash.to_string(), plaintext.bright_green().bold())
+        );
+    }
+
+    pub fn print_batch_complete_optimized(result: &BatchResult, output_path: &PathBuf) {
+        println!();
+        println!("{}", "BATCH PROCESSING COMPLETE".bright_green().bold());
+        println!("{}", "═════════════════════════════════".bright_green());
+        println!();
+
+        println!(
+            "{}",
+            format!("Total hashes: {}", result.total)
+                .bright_white()
+                .bold()
+        );
+        println!(
+            "{}",
+            format!("Unique hashes: {}", result.unique)
+                .bright_white()
+        );
+        if result.skipped > 0 {
+            println!(
+                "{}",
+                format!("Skipped (invalid): {}", result.skipped)
+                    .bright_yellow()
+            );
+        }
+        println!(
+            "{}",
+            format!("Cracked: {}", result.cracked).bright_green().bold()
+        );
+        println!(
+            "{}",
+            format!("Not found: {}", result.failed).bright_red().bold()
+        );
+        println!(
+            "{}",
+            format!(
+                "Success rate: {:.1}%",
+                (result.cracked as f64 / result.total as f64) * 100.0
+            )
+            .bright_white()
+        );
+        println!(
+            "{}",
+            format!("Time elapsed: {:.2?}", result.elapsed).bright_white()
+        );
+        println!();
+        println!(
+            "{}",
+            format!("Results saved to: {}", output_path.display()).bright_cyan()
+        );
     }
 } 
