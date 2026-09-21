@@ -1,9 +1,9 @@
-FROM rust:1.80-slim
+FROM rust:1.90-slim
 WORKDIR /app
 RUN apt-get update && apt-get install -y \
     vim \
     && rm -rf /var/lib/apt/lists/*
-COPY Cargo.toml .
+COPY Cargo.toml Cargo.lock ./
 COPY src/ ./src/
 RUN cargo build
 CMD ["cargo", "run", "--", "--help"] 
