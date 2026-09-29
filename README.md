@@ -1,5 +1,6 @@
 # Crack Hash
 
+[![CI](https://github.com/kOaDT/crack-hash/actions/workflows/ci.yml/badge.svg)](https://github.com/kOaDT/crack-hash/actions/workflows/ci.yml)
 [![Rust](https://img.shields.io/badge/Rust-1.70%2B-orange?logo=rust)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Version](https://img.shields.io/badge/version-1.2.0-green.svg)](https://github.com/kOaDT/crack-hash/releases)
