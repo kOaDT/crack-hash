@@ -7,7 +7,7 @@ license = "MIT"
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }
 sha2 = "0.10"
-md5 = "0.7"
+md5 = "0.8"
 sha1 = "0.10"
 colored = "2.0"
 rayon = "1.8"
