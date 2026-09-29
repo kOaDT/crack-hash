@@ -8,7 +8,7 @@ pub struct Display;
 
 impl Display {
     pub fn print_banner() {
-        println!("{}", "🔓 Crack Hash v1.1.0 🔓".bright_yellow().bold());
+        println!("{}", format!("🔓 Crack Hash v{} 🔓", env!("CARGO_PKG_VERSION")).bright_yellow().bold());
         println!("{}", "═════════════════════════".bright_yellow());
         println!();
     }

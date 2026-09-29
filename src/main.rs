@@ -94,7 +94,7 @@ impl From<std::io::Error> for CrackError {
 #[derive(Parser)]
 #[command(name = "crack-hash")]
 #[command(about = "A hash cracking tool that supports multiple algorithms")]
-#[command(version = "1.1.0")]
+#[command(version)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
