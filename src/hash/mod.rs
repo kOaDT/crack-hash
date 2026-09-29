@@ -8,24 +8,24 @@ pub use sha1::Sha1Hasher;
 pub use sha256::Sha256Hasher;
 
 /// Factory function to create a hasher based on the algorithm name
-/// 
+///
 /// # Arguments
 /// * `algo` - Algorithm name (case-insensitive): "md5", "sha1", "sha256"
-/// 
+///
 /// # Returns
 /// * `Some(Box<dyn Hasher>)` - The corresponding hasher implementation
 /// * `None` - If the algorithm is not supported
-/// 
+///
 /// # Examples
 /// ```
 /// use hash::get_hasher;
-/// 
+///
 /// let hasher = get_hasher("md5").unwrap();
 /// assert_eq!(hasher.name(), "MD5");
-/// 
+///
 /// let hasher = get_hasher("SHA256").unwrap();
 /// assert_eq!(hasher.name(), "SHA256");
-/// 
+///
 /// assert!(get_hasher("unsupported").is_none());
 /// ```
 pub fn get_hasher(algo: &str) -> Option<Box<dyn Hasher>> {
@@ -64,7 +64,7 @@ mod tests {
         let hasher_upper = get_hasher("MD5").unwrap();
         let hasher_lower = get_hasher("md5").unwrap();
         let hasher_mixed = get_hasher("Md5").unwrap();
-        
+
         assert_eq!(hasher_upper.name(), "MD5");
         assert_eq!(hasher_lower.name(), "MD5");
         assert_eq!(hasher_mixed.name(), "MD5");
@@ -87,7 +87,13 @@ mod tests {
         let input = b"hello";
 
         assert_eq!(md5_hasher.hash(input), "5d41402abc4b2a76b9719d911017c592");
-        assert_eq!(sha1_hasher.hash(input), "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d");
-        assert_eq!(sha256_hasher.hash(input), "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");
+        assert_eq!(
+            sha1_hasher.hash(input),
+            "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+        );
+        assert_eq!(
+            sha256_hasher.hash(input),
+            "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        );
     }
-} 
+}

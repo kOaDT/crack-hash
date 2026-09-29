@@ -1,13 +1,13 @@
+use indicatif::{ProgressBar, ProgressStyle};
+use rayon::prelude::*;
 use std::path::PathBuf;
-use std::time::Instant;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use rayon::prelude::*;
-use indicatif::{ProgressBar, ProgressStyle};
+use std::time::Instant;
 
-use crate::{Hasher, CrackError};
 use crate::display::Display;
 use crate::util::read_trimmed_lines;
+use crate::{CrackError, Hasher};
 
 pub struct HashCracker {
     hasher: Box<dyn Hasher>,
@@ -52,11 +52,11 @@ impl HashCracker {
 
     pub fn crack(&self) -> Result<Option<String>, CrackError> {
         self.validate_wordlist()?;
-        
+
         Display::print_start_info(self.hasher.name(), &self.target_hash);
-        
+
         let words = self.load_wordlist()?;
-        
+
         if words.is_empty() {
             return Err(CrackError::EmptyWordlist);
         }
@@ -71,10 +71,10 @@ impl HashCracker {
         let result = self.attempt_crack_parallel(&words, target_hash, &stats, &progress_bar);
 
         progress_bar.finish_with_message("Cracking completed");
-        
+
         let attempts = stats.get_attempts();
         let elapsed = stats.elapsed();
-        
+
         match result {
             Some(plaintext) => {
                 Display::print_success(&plaintext, attempts, elapsed);
@@ -89,12 +89,12 @@ impl HashCracker {
 
     fn create_progress_bar(&self, total_words: u64) -> ProgressBar {
         let pb = ProgressBar::new(total_words);
-        
+
         let style = ProgressStyle::default_bar()
             .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {per_sec}")
             .unwrap()
             .progress_chars("#>-");
-        
+
         pb.set_style(style);
         pb.set_message("Starting hash cracking...");
         pb
@@ -102,7 +102,9 @@ impl HashCracker {
 
     fn validate_wordlist(&self) -> Result<(), CrackError> {
         if !self.wordlist_path.exists() {
-            return Err(CrackError::FileNotFound(self.wordlist_path.display().to_string()));
+            return Err(CrackError::FileNotFound(
+                self.wordlist_path.display().to_string(),
+            ));
         }
         Ok(())
     }
@@ -119,38 +121,36 @@ impl HashCracker {
         progress_bar: &Arc<ProgressBar>,
     ) -> Option<String> {
         const UPDATE_INTERVAL: u64 = 1000;
-        
+
         let chunk_size = (words.len() / rayon::current_num_threads()).max(1);
         let hasher = self.hasher.as_ref();
-        
-        words
-            .par_chunks(chunk_size)
-            .find_map_any(|chunk| {
-                let mut local_count: u64 = 0;
-                
-                for word in chunk {
-                    let computed_hash = hasher.hash(word);
-                    if computed_hash.eq_ignore_ascii_case(target_hash) {
-                        stats.add(local_count % UPDATE_INTERVAL + 1);
-                        progress_bar.set_position(stats.get_attempts());
-                        return Some(String::from_utf8_lossy(word).into_owned());
-                    }
-                    
-                    local_count += 1;
-                    if local_count % UPDATE_INTERVAL == 0 {
-                        stats.add(UPDATE_INTERVAL);
-                        progress_bar.set_position(stats.get_attempts());
-                    }
+
+        words.par_chunks(chunk_size).find_map_any(|chunk| {
+            let mut local_count: u64 = 0;
+
+            for word in chunk {
+                let computed_hash = hasher.hash(word);
+                if computed_hash.eq_ignore_ascii_case(target_hash) {
+                    stats.add(local_count % UPDATE_INTERVAL + 1);
+                    progress_bar.set_position(stats.get_attempts());
+                    return Some(String::from_utf8_lossy(word).into_owned());
                 }
-                
-                let remaining = local_count % UPDATE_INTERVAL;
-                if remaining > 0 {
-                    stats.add(remaining);
+
+                local_count += 1;
+                if local_count.is_multiple_of(UPDATE_INTERVAL) {
+                    stats.add(UPDATE_INTERVAL);
                     progress_bar.set_position(stats.get_attempts());
                 }
-                
-                None
-            })
+            }
+
+            let remaining = local_count % UPDATE_INTERVAL;
+            if remaining > 0 {
+                stats.add(remaining);
+                progress_bar.set_position(stats.get_attempts());
+            }
+
+            None
+        })
     }
 
     pub fn validate_hash_format(algorithm: &str, hash: &str) -> Result<(), CrackError> {
@@ -194,6 +194,9 @@ mod tests {
         let target = "cfcbbfc54cf20afe9ec1286446221bac".to_string();
         let cracker = HashCracker::new(Box::new(Md5Hasher::new()), target, wordlist_path);
 
-        assert_eq!(cracker.crack().unwrap(), Some("\u{fffd}\u{fffd}pw".to_string()));
+        assert_eq!(
+            cracker.crack().unwrap(),
+            Some("\u{fffd}\u{fffd}pw".to_string())
+        );
     }
 }

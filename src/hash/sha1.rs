@@ -1,5 +1,5 @@
 use crate::Hasher;
-use sha1::{Sha1, Digest};
+use sha1::{Digest, Sha1};
 
 pub struct Sha1Hasher;
 
@@ -58,4 +58,4 @@ mod tests {
         let result = hasher.hash(b"password123");
         assert_eq!(result, "cbfdac6008f9cab4083784cbd1874f76618d2a97");
     }
-} 
+}

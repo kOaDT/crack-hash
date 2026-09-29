@@ -16,6 +16,8 @@ use crate::hash::get_hasher;
 use crate::util::read_trimmed_lines;
 use crate::CrackError;
 
+type CsvContents = (Option<Vec<String>>, Vec<Vec<String>>);
+
 pub struct BatchResult {
     pub total: usize,
     pub unique: usize,
@@ -72,7 +74,13 @@ impl TxtBatchProcessor {
 
         let unique_count = target_map.len();
         let skipped_count = invalid_indices.len();
-        Display::print_batch_start_optimized("TXT", total, unique_count, skipped_count, &self.algorithm);
+        Display::print_batch_start_optimized(
+            "TXT",
+            total,
+            unique_count,
+            skipped_count,
+            &self.algorithm,
+        );
 
         let start_time = Instant::now();
 
@@ -262,10 +270,7 @@ impl CsvBatchProcessor {
         let mut empty_indices: Vec<usize> = Vec::new();
 
         for (idx, record) in records.iter().enumerate() {
-            let hash = record
-                .get(self.hash_column)
-                .map(|s| s.trim())
-                .unwrap_or("");
+            let hash = record.get(self.hash_column).map(|s| s.trim()).unwrap_or("");
 
             if hash.is_empty() {
                 empty_indices.push(idx);
@@ -283,7 +288,13 @@ impl CsvBatchProcessor {
 
         let unique_count = target_map.len();
         let skipped_count = invalid_indices.len() + empty_indices.len();
-        Display::print_batch_start_optimized("CSV", total, unique_count, skipped_count, &self.algorithm);
+        Display::print_batch_start_optimized(
+            "CSV",
+            total,
+            unique_count,
+            skipped_count,
+            &self.algorithm,
+        );
 
         let start_time = Instant::now();
 
@@ -363,7 +374,7 @@ impl CsvBatchProcessor {
         Ok(result)
     }
 
-    fn load_csv(&self) -> Result<(Option<Vec<String>>, Vec<Vec<String>>), CrackError> {
+    fn load_csv(&self) -> Result<CsvContents, CrackError> {
         if !self.input_path.exists() {
             return Err(CrackError::FileNotFound(
                 self.input_path.display().to_string(),

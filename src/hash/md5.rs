@@ -57,4 +57,4 @@ mod tests {
         let result = hasher.hash(b"password123");
         assert_eq!(result, "482c811da5d5b4bc6d497ffa98491e38");
     }
-} 
+}

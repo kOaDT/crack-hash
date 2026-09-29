@@ -32,7 +32,8 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("wordlist.bin");
         let mut file = File::create(&path).unwrap();
-        file.write_all(b"password\n\n  spaced  \r\n\xff\xfe\ntail").unwrap();
+        file.write_all(b"password\n\n  spaced  \r\n\xff\xfe\ntail")
+            .unwrap();
 
         let lines = read_trimmed_lines(&path).unwrap();
 

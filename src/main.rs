@@ -21,14 +21,20 @@ pub trait Hasher: Send + Sync {
 #[derive(Debug)]
 pub enum CrackError {
     UnsupportedAlgorithm(String),
-    InvalidHashLength { expected_len: usize, actual_len: usize },
+    InvalidHashLength {
+        expected_len: usize,
+        actual_len: usize,
+    },
     InvalidHashCharacters,
     FileNotFound(String),
     IoError(std::io::Error),
     EmptyWordlist,
     EmptyInputFile,
     CsvError(String),
-    InvalidColumnIndex { index: usize, max: usize },
+    InvalidColumnIndex {
+        index: usize,
+        max: usize,
+    },
 }
 
 impl std::fmt::Display for CrackError {
@@ -191,7 +197,15 @@ fn main() {
             hash_column,
             delimiter,
             no_header,
-        } => run_batch_csv_mode(algo, input, output, wordlist, hash_column, delimiter, !no_header),
+        } => run_batch_csv_mode(
+            algo,
+            input,
+            output,
+            wordlist,
+            hash_column,
+            delimiter,
+            !no_header,
+        ),
     };
 
     std::process::exit(exit_code);
@@ -251,8 +265,15 @@ fn run_batch_csv_mode(
     delimiter: char,
     header: bool,
 ) -> i32 {
-    let processor =
-        CsvBatchProcessor::new(algo, input, output, wordlist, hash_column, delimiter, header);
+    let processor = CsvBatchProcessor::new(
+        algo,
+        input,
+        output,
+        wordlist,
+        hash_column,
+        delimiter,
+        header,
+    );
 
     match processor.process() {
         Ok(result) => {
