@@ -84,8 +84,8 @@ mod tests {
         let sha256_hasher = get_hasher("sha256").unwrap();
 
         // Test actual hashing functionality
-        let input = "hello";
-        
+        let input = b"hello";
+
         assert_eq!(md5_hasher.hash(input), "5d41402abc4b2a76b9719d911017c592");
         assert_eq!(sha1_hasher.hash(input), "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d");
         assert_eq!(sha256_hasher.hash(input), "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");

@@ -1,6 +1,4 @@
 use std::path::PathBuf;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
 use std::time::Instant;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -9,6 +7,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::{Hasher, CrackError};
 use crate::display::Display;
+use crate::util::read_trimmed_lines;
 
 pub struct HashCracker {
     hasher: Box<dyn Hasher>,
@@ -108,28 +107,13 @@ impl HashCracker {
         Ok(())
     }
 
-    fn load_wordlist(&self) -> Result<Vec<String>, CrackError> {
-        let file = File::open(&self.wordlist_path)?;
-        let reader = BufReader::new(file);
-        
-        let mut words = Vec::new();
-        for line_result in reader.lines() {
-            let word = match line_result {
-                Ok(line) => line.trim().to_string(),
-                Err(_) => continue,
-            };
-            
-            if !word.is_empty() {
-                words.push(word);
-            }
-        }
-        
-        Ok(words)
+    fn load_wordlist(&self) -> Result<Vec<Vec<u8>>, CrackError> {
+        Ok(read_trimmed_lines(&self.wordlist_path)?)
     }
 
     fn attempt_crack_parallel(
         &self,
-        words: &[String],
+        words: &[Vec<u8>],
         target_hash: &str,
         stats: &Arc<CrackingStats>,
         progress_bar: &Arc<ProgressBar>,
@@ -147,9 +131,9 @@ impl HashCracker {
                 for word in chunk {
                     let computed_hash = hasher.hash(word);
                     if computed_hash.eq_ignore_ascii_case(target_hash) {
-                        stats.add(local_count + 1);
+                        stats.add(local_count % UPDATE_INTERVAL + 1);
                         progress_bar.set_position(stats.get_attempts());
-                        return Some(word.clone());
+                        return Some(String::from_utf8_lossy(word).into_owned());
                     }
                     
                     local_count += 1;
@@ -190,4 +174,26 @@ impl HashCracker {
 
         Ok(())
     }
-} 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hash::Md5Hasher;
+    use std::fs::File;
+    use std::io::Write;
+    use tempfile::tempdir;
+
+    #[test]
+    fn cracks_non_utf8_wordlist_entry() {
+        let dir = tempdir().unwrap();
+        let wordlist_path = dir.path().join("wordlist.txt");
+        let mut file = File::create(&wordlist_path).unwrap();
+        file.write_all(b"hello\n\xff\xfepw\nworld\n").unwrap();
+
+        let target = "cfcbbfc54cf20afe9ec1286446221bac".to_string();
+        let cracker = HashCracker::new(Box::new(Md5Hasher::new()), target, wordlist_path);
+
+        assert_eq!(cracker.crack().unwrap(), Some("\u{fffd}\u{fffd}pw".to_string()));
+    }
+}

@@ -5,6 +5,7 @@ mod batch;
 mod cracker;
 mod display;
 mod hash;
+mod util;
 
 use batch::{CsvBatchProcessor, TxtBatchProcessor};
 use cracker::HashCracker;
@@ -14,7 +15,7 @@ use hash::get_hasher;
 pub trait Hasher: Send + Sync {
     fn name(&self) -> &'static str;
 
-    fn hash(&self, input: &str) -> String;
+    fn hash(&self, input: &[u8]) -> String;
 }
 
 #[derive(Debug)]

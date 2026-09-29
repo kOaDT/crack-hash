@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufRead, BufReader, BufWriter, Write};
-use std::path::PathBuf;
+use std::io::{BufWriter, Write};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -12,6 +13,7 @@ use rayon::prelude::*;
 use crate::cracker::HashCracker;
 use crate::display::Display;
 use crate::hash::get_hasher;
+use crate::util::read_trimmed_lines;
 use crate::CrackError;
 
 pub struct BatchResult {
@@ -80,40 +82,41 @@ impl TxtBatchProcessor {
         let progress_bar = Arc::new(progress_bar);
 
         let found: Arc<Mutex<HashMap<String, String>>> = Arc::new(Mutex::new(HashMap::new()));
-        let remaining = Arc::new(Mutex::new(target_map.len()));
+        let remaining = Arc::new(AtomicUsize::new(target_map.len()));
 
         let chunk_size = (words.len() / rayon::current_num_threads()).max(1000);
 
         words.par_chunks(chunk_size).for_each(|chunk| {
             let mut local_found: Vec<(String, String)> = Vec::new();
+            let mut processed: u64 = 0;
 
             for word in chunk {
-                if *remaining.lock().unwrap() == 0 {
+                if remaining.load(Ordering::Relaxed) == 0 {
                     break;
                 }
+                processed += 1;
 
                 let computed = hasher.hash(word);
                 let computed_lower = computed.to_lowercase();
 
                 if target_map.contains_key(&computed_lower) {
-                    local_found.push((computed_lower, word.clone()));
+                    local_found.push((computed_lower, String::from_utf8_lossy(word).into_owned()));
                 }
             }
 
             if !local_found.is_empty() {
                 let mut found_guard = found.lock().unwrap();
-                let mut remaining_guard = remaining.lock().unwrap();
 
                 for (hash, plaintext) in local_found {
                     if !found_guard.contains_key(&hash) {
                         found_guard.insert(hash.clone(), plaintext.clone());
-                        *remaining_guard = remaining_guard.saturating_sub(1);
+                        remaining.fetch_sub(1, Ordering::Relaxed);
                         Display::print_batch_match(&hash, &plaintext);
                     }
                 }
             }
 
-            progress_bar.inc(chunk.len() as u64);
+            progress_bar.inc(processed);
         });
 
         progress_bar.finish_with_message("Wordlist processed");
@@ -159,33 +162,23 @@ impl TxtBatchProcessor {
             ));
         }
 
-        let file = File::open(&self.input_path)?;
-        let reader = BufReader::new(file);
-
-        let hashes: Vec<String> = reader
-            .lines()
-            .filter_map(|line| line.ok())
-            .map(|line| line.trim().to_string())
-            .filter(|line| !line.is_empty())
+        let hashes = read_trimmed_lines(&self.input_path)?
+            .into_iter()
+            .map(|line| {
+                String::from_utf8(line)
+                    .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).into_owned())
+            })
             .collect();
 
         Ok(hashes)
     }
 
-    pub fn load_wordlist(path: &PathBuf) -> Result<Vec<String>, CrackError> {
+    pub fn load_wordlist(path: &Path) -> Result<Vec<Vec<u8>>, CrackError> {
         if !path.exists() {
             return Err(CrackError::FileNotFound(path.display().to_string()));
         }
 
-        let file = File::open(path)?;
-        let reader = BufReader::new(file);
-
-        let words: Vec<String> = reader
-            .lines()
-            .filter_map(|line| line.ok())
-            .map(|line| line.trim().to_string())
-            .filter(|line| !line.is_empty())
-            .collect();
+        let words = read_trimmed_lines(path)?;
 
         if words.is_empty() {
             return Err(CrackError::EmptyWordlist);
@@ -300,40 +293,41 @@ impl CsvBatchProcessor {
         let progress_bar = Arc::new(progress_bar);
 
         let found: Arc<Mutex<HashMap<String, String>>> = Arc::new(Mutex::new(HashMap::new()));
-        let remaining = Arc::new(Mutex::new(target_map.len()));
+        let remaining = Arc::new(AtomicUsize::new(target_map.len()));
 
         let chunk_size = (words.len() / rayon::current_num_threads()).max(1000);
 
         words.par_chunks(chunk_size).for_each(|chunk| {
             let mut local_found: Vec<(String, String)> = Vec::new();
+            let mut processed: u64 = 0;
 
             for word in chunk {
-                if *remaining.lock().unwrap() == 0 {
+                if remaining.load(Ordering::Relaxed) == 0 {
                     break;
                 }
+                processed += 1;
 
                 let computed = hasher.hash(word);
                 let computed_lower = computed.to_lowercase();
 
                 if target_map.contains_key(&computed_lower) {
-                    local_found.push((computed_lower, word.clone()));
+                    local_found.push((computed_lower, String::from_utf8_lossy(word).into_owned()));
                 }
             }
 
             if !local_found.is_empty() {
                 let mut found_guard = found.lock().unwrap();
-                let mut remaining_guard = remaining.lock().unwrap();
 
                 for (hash, plaintext) in local_found {
                     if !found_guard.contains_key(&hash) {
                         found_guard.insert(hash.clone(), plaintext.clone());
-                        *remaining_guard = remaining_guard.saturating_sub(1);
+                        remaining.fetch_sub(1, Ordering::Relaxed);
                         Display::print_batch_match(&hash, &plaintext);
                     }
                 }
             }
 
-            progress_bar.inc(chunk.len() as u64);
+            progress_bar.inc(processed);
         });
 
         progress_bar.finish_with_message("Wordlist processed");

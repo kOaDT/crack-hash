@@ -8,9 +8,9 @@ impl Hasher for Sha1Hasher {
         "SHA1"
     }
 
-    fn hash(&self, input: &str) -> String {
+    fn hash(&self, input: &[u8]) -> String {
         let mut hasher = Sha1::new();
-        hasher.update(input.as_bytes());
+        hasher.update(input);
         let result = hasher.finalize();
         format!("{:x}", result)
     }
@@ -41,21 +41,21 @@ mod tests {
     #[test]
     fn test_sha1_hash() {
         let hasher = Sha1Hasher::new();
-        let result = hasher.hash("hello");
+        let result = hasher.hash(b"hello");
         assert_eq!(result, "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d");
     }
 
     #[test]
     fn test_sha1_empty_string() {
         let hasher = Sha1Hasher::new();
-        let result = hasher.hash("");
+        let result = hasher.hash(b"");
         assert_eq!(result, "da39a3ee5e6b4b0d3255bfef95601890afd80709");
     }
 
     #[test]
     fn test_sha1_password_example() {
         let hasher = Sha1Hasher::new();
-        let result = hasher.hash("password123");
+        let result = hasher.hash(b"password123");
         assert_eq!(result, "cbfdac6008f9cab4083784cbd1874f76618d2a97");
     }
 } 

@@ -8,9 +8,9 @@ impl Hasher for Sha256Hasher {
         "SHA256"
     }
 
-    fn hash(&self, input: &str) -> String {
+    fn hash(&self, input: &[u8]) -> String {
         let mut hasher = Sha256::new();
-        hasher.update(input.as_bytes());
+        hasher.update(input);
         let result = hasher.finalize();
         format!("{:x}", result)
     }
@@ -41,21 +41,21 @@ mod tests {
     #[test]
     fn test_sha256_hash() {
         let hasher = Sha256Hasher::new();
-        let result = hasher.hash("hello");
+        let result = hasher.hash(b"hello");
         assert_eq!(result, "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");
     }
 
     #[test]
     fn test_sha256_empty_string() {
         let hasher = Sha256Hasher::new();
-        let result = hasher.hash("");
+        let result = hasher.hash(b"");
         assert_eq!(result, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
     }
 
     #[test]
     fn test_sha256_password_example() {
         let hasher = Sha256Hasher::new();
-        let result = hasher.hash("password123");
+        let result = hasher.hash(b"password123");
         assert_eq!(result, "ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f");
     }
 } 
