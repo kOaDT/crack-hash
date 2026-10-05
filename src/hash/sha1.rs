@@ -1,5 +1,6 @@
+use crate::hash::Digest;
 use crate::Hasher;
-use sha1::{Digest, Sha1};
+use sha1::{Digest as _, Sha1};
 
 pub struct Sha1Hasher;
 
@@ -8,11 +9,10 @@ impl Hasher for Sha1Hasher {
         "SHA1"
     }
 
-    fn hash(&self, input: &[u8]) -> String {
+    fn hash(&self, input: &[u8]) -> Digest {
         let mut hasher = Sha1::new();
         hasher.update(input);
-        let result = hasher.finalize();
-        format!("{:x}", result)
+        Digest::new(&hasher.finalize())
     }
 }
 
@@ -41,21 +41,27 @@ mod tests {
     #[test]
     fn test_sha1_hash() {
         let hasher = Sha1Hasher::new();
-        let result = hasher.hash(b"hello");
-        assert_eq!(result, "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d");
+        assert_eq!(
+            hasher.hash(b"hello").to_hex(),
+            "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+        );
     }
 
     #[test]
     fn test_sha1_empty_string() {
         let hasher = Sha1Hasher::new();
-        let result = hasher.hash(b"");
-        assert_eq!(result, "da39a3ee5e6b4b0d3255bfef95601890afd80709");
+        assert_eq!(
+            hasher.hash(b"").to_hex(),
+            "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+        );
     }
 
     #[test]
     fn test_sha1_password_example() {
         let hasher = Sha1Hasher::new();
-        let result = hasher.hash(b"password123");
-        assert_eq!(result, "cbfdac6008f9cab4083784cbd1874f76618d2a97");
+        assert_eq!(
+            hasher.hash(b"password123").to_hex(),
+            "cbfdac6008f9cab4083784cbd1874f76618d2a97"
+        );
     }
 }

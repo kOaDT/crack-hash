@@ -1,3 +1,4 @@
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -12,7 +13,7 @@ use rayon::prelude::*;
 
 use crate::cracker::HashCracker;
 use crate::display::Display;
-use crate::hash::get_hasher;
+use crate::hash::{decode_hex, get_hasher, to_hex};
 use crate::util::read_trimmed_lines;
 use crate::CrackError;
 
@@ -60,16 +61,16 @@ impl TxtBatchProcessor {
         let hasher = get_hasher(&self.algorithm)
             .ok_or_else(|| CrackError::UnsupportedAlgorithm(self.algorithm.clone()))?;
 
-        let mut target_map: HashMap<String, Vec<usize>> = HashMap::new();
+        let mut target_map: HashMap<Vec<u8>, Vec<usize>> = HashMap::new();
         let mut invalid_indices: Vec<usize> = Vec::new();
 
         for (idx, hash) in hashes.iter().enumerate() {
-            if HashCracker::validate_hash_format(&self.algorithm, hash).is_err() {
-                invalid_indices.push(idx);
-                continue;
+            match decode_hex(hash) {
+                Some(bytes) if HashCracker::validate_hash_format(&self.algorithm, hash).is_ok() => {
+                    target_map.entry(bytes).or_default().push(idx);
+                }
+                _ => invalid_indices.push(idx),
             }
-            let normalized = hash.to_lowercase();
-            target_map.entry(normalized).or_default().push(idx);
         }
 
         let unique_count = target_map.len();
@@ -89,13 +90,13 @@ impl TxtBatchProcessor {
         let progress_bar = Self::create_wordlist_progress_bar(word_count);
         let progress_bar = Arc::new(progress_bar);
 
-        let found: Arc<Mutex<HashMap<String, String>>> = Arc::new(Mutex::new(HashMap::new()));
+        let found: Arc<Mutex<HashMap<Vec<u8>, String>>> = Arc::new(Mutex::new(HashMap::new()));
         let remaining = Arc::new(AtomicUsize::new(target_map.len()));
 
         let chunk_size = (words.len() / rayon::current_num_threads()).max(1000);
 
         words.par_chunks(chunk_size).for_each(|chunk| {
-            let mut local_found: Vec<(String, String)> = Vec::new();
+            let mut local_found: Vec<(Vec<u8>, String)> = Vec::new();
             let mut processed: u64 = 0;
 
             for word in chunk {
@@ -104,11 +105,12 @@ impl TxtBatchProcessor {
                 }
                 processed += 1;
 
-                let computed = hasher.hash(word);
-                let computed_lower = computed.to_lowercase();
-
-                if target_map.contains_key(&computed_lower) {
-                    local_found.push((computed_lower, String::from_utf8_lossy(word).into_owned()));
+                let digest = hasher.hash(word);
+                if target_map.contains_key(digest.as_bytes()) {
+                    local_found.push((
+                        digest.as_bytes().to_vec(),
+                        String::from_utf8_lossy(word).into_owned(),
+                    ));
                 }
             }
 
@@ -116,10 +118,10 @@ impl TxtBatchProcessor {
                 let mut found_guard = found.lock().unwrap();
 
                 for (hash, plaintext) in local_found {
-                    if !found_guard.contains_key(&hash) {
-                        found_guard.insert(hash.clone(), plaintext.clone());
+                    if let Entry::Vacant(entry) = found_guard.entry(hash) {
+                        Display::print_batch_match(&to_hex(entry.key()), &plaintext);
+                        entry.insert(plaintext);
                         remaining.fetch_sub(1, Ordering::Relaxed);
-                        Display::print_batch_match(&hash, &plaintext);
                     }
                 }
             }
@@ -133,8 +135,8 @@ impl TxtBatchProcessor {
 
         let mut results: Vec<(String, Option<String>)> = vec![(String::new(), None); total];
 
-        for (hash_lower, indices) in target_map.iter() {
-            let plaintext = found_map.get(hash_lower).cloned();
+        for (target_bytes, indices) in target_map.iter() {
+            let plaintext = found_map.get(target_bytes).cloned();
             for &idx in indices {
                 results[idx] = (hashes[idx].clone(), plaintext.clone());
             }
@@ -265,7 +267,7 @@ impl CsvBatchProcessor {
         let hasher = get_hasher(&self.algorithm)
             .ok_or_else(|| CrackError::UnsupportedAlgorithm(self.algorithm.clone()))?;
 
-        let mut target_map: HashMap<String, Vec<usize>> = HashMap::new();
+        let mut target_map: HashMap<Vec<u8>, Vec<usize>> = HashMap::new();
         let mut invalid_indices: Vec<usize> = Vec::new();
         let mut empty_indices: Vec<usize> = Vec::new();
 
@@ -277,13 +279,12 @@ impl CsvBatchProcessor {
                 continue;
             }
 
-            if HashCracker::validate_hash_format(&self.algorithm, hash).is_err() {
-                invalid_indices.push(idx);
-                continue;
+            match decode_hex(hash) {
+                Some(bytes) if HashCracker::validate_hash_format(&self.algorithm, hash).is_ok() => {
+                    target_map.entry(bytes).or_default().push(idx);
+                }
+                _ => invalid_indices.push(idx),
             }
-
-            let normalized = hash.to_lowercase();
-            target_map.entry(normalized).or_default().push(idx);
         }
 
         let unique_count = target_map.len();
@@ -303,13 +304,13 @@ impl CsvBatchProcessor {
         let progress_bar = TxtBatchProcessor::create_wordlist_progress_bar(word_count);
         let progress_bar = Arc::new(progress_bar);
 
-        let found: Arc<Mutex<HashMap<String, String>>> = Arc::new(Mutex::new(HashMap::new()));
+        let found: Arc<Mutex<HashMap<Vec<u8>, String>>> = Arc::new(Mutex::new(HashMap::new()));
         let remaining = Arc::new(AtomicUsize::new(target_map.len()));
 
         let chunk_size = (words.len() / rayon::current_num_threads()).max(1000);
 
         words.par_chunks(chunk_size).for_each(|chunk| {
-            let mut local_found: Vec<(String, String)> = Vec::new();
+            let mut local_found: Vec<(Vec<u8>, String)> = Vec::new();
             let mut processed: u64 = 0;
 
             for word in chunk {
@@ -318,11 +319,12 @@ impl CsvBatchProcessor {
                 }
                 processed += 1;
 
-                let computed = hasher.hash(word);
-                let computed_lower = computed.to_lowercase();
-
-                if target_map.contains_key(&computed_lower) {
-                    local_found.push((computed_lower, String::from_utf8_lossy(word).into_owned()));
+                let digest = hasher.hash(word);
+                if target_map.contains_key(digest.as_bytes()) {
+                    local_found.push((
+                        digest.as_bytes().to_vec(),
+                        String::from_utf8_lossy(word).into_owned(),
+                    ));
                 }
             }
 
@@ -330,10 +332,10 @@ impl CsvBatchProcessor {
                 let mut found_guard = found.lock().unwrap();
 
                 for (hash, plaintext) in local_found {
-                    if !found_guard.contains_key(&hash) {
-                        found_guard.insert(hash.clone(), plaintext.clone());
+                    if let Entry::Vacant(entry) = found_guard.entry(hash) {
+                        Display::print_batch_match(&to_hex(entry.key()), &plaintext);
+                        entry.insert(plaintext);
                         remaining.fetch_sub(1, Ordering::Relaxed);
-                        Display::print_batch_match(&hash, &plaintext);
                     }
                 }
             }
@@ -348,8 +350,8 @@ impl CsvBatchProcessor {
         let mut results: Vec<(Vec<String>, Option<String>)> =
             records.iter().map(|r| (r.clone(), None)).collect();
 
-        for (hash_lower, indices) in target_map.iter() {
-            let plaintext = found_map.get(hash_lower).cloned();
+        for (target_bytes, indices) in target_map.iter() {
+            let plaintext = found_map.get(target_bytes).cloned();
             for &idx in indices {
                 results[idx].1 = plaintext.clone();
             }

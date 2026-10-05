@@ -7,6 +7,62 @@ pub use md5::Md5Hasher;
 pub use sha1::Sha1Hasher;
 pub use sha256::Sha256Hasher;
 
+/// Largest digest produced by a supported algorithm (SHA256).
+pub const MAX_DIGEST_LEN: usize = 32;
+
+/// Raw digest bytes held inline on the stack so the hot loop never allocates.
+#[derive(Clone, Copy)]
+pub struct Digest {
+    bytes: [u8; MAX_DIGEST_LEN],
+    len: usize,
+}
+
+impl Digest {
+    pub fn new(raw: &[u8]) -> Self {
+        let mut bytes = [0u8; MAX_DIGEST_LEN];
+        bytes[..raw.len()].copy_from_slice(raw);
+        Self {
+            bytes,
+            len: raw.len(),
+        }
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.bytes[..self.len]
+    }
+
+    pub fn to_hex(self) -> String {
+        to_hex(self.as_bytes())
+    }
+}
+
+pub fn to_hex(bytes: &[u8]) -> String {
+    use std::fmt::Write;
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        let _ = write!(out, "{:02x}", byte);
+    }
+    out
+}
+
+/// Decode a hexadecimal string into bytes, accepting either case.
+/// Returns `None` for odd length or any non-hex character.
+pub fn decode_hex(hex: &str) -> Option<Vec<u8>> {
+    if !hex.len().is_multiple_of(2) {
+        return None;
+    }
+
+    let (pairs, _) = hex.as_bytes().as_chunks::<2>();
+    pairs
+        .iter()
+        .map(|pair| {
+            let hi = (pair[0] as char).to_digit(16)?;
+            let lo = (pair[1] as char).to_digit(16)?;
+            Some(((hi << 4) | lo) as u8)
+        })
+        .collect()
+}
+
 /// Factory function to create a hasher based on the algorithm name
 ///
 /// # Arguments
@@ -78,6 +134,18 @@ mod tests {
     }
 
     #[test]
+    fn decode_hex_roundtrips_and_is_case_insensitive() {
+        let bytes = decode_hex("5D41402ABC4b2a76b9719d911017c592").unwrap();
+        assert_eq!(to_hex(&bytes), "5d41402abc4b2a76b9719d911017c592");
+    }
+
+    #[test]
+    fn decode_hex_rejects_malformed_input() {
+        assert!(decode_hex("abc").is_none());
+        assert!(decode_hex("zz").is_none());
+    }
+
+    #[test]
     fn test_hasher_functionality() {
         let md5_hasher = get_hasher("md5").unwrap();
         let sha1_hasher = get_hasher("sha1").unwrap();
@@ -86,13 +154,16 @@ mod tests {
         // Test actual hashing functionality
         let input = b"hello";
 
-        assert_eq!(md5_hasher.hash(input), "5d41402abc4b2a76b9719d911017c592");
         assert_eq!(
-            sha1_hasher.hash(input),
+            md5_hasher.hash(input).to_hex(),
+            "5d41402abc4b2a76b9719d911017c592"
+        );
+        assert_eq!(
+            sha1_hasher.hash(input).to_hex(),
             "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
         );
         assert_eq!(
-            sha256_hasher.hash(input),
+            sha256_hasher.hash(input).to_hex(),
             "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
         );
     }
