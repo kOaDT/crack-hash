@@ -10,12 +10,12 @@ mod util;
 use batch::{CsvBatchProcessor, TxtBatchProcessor};
 use cracker::HashCracker;
 use display::Display;
-use hash::get_hasher;
+use hash::{get_hasher, Digest};
 
 pub trait Hasher: Send + Sync {
     fn name(&self) -> &'static str;
 
-    fn hash(&self, input: &[u8]) -> String;
+    fn hash(&self, input: &[u8]) -> Digest;
 }
 
 #[derive(Debug)]

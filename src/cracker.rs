@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::display::Display;
+use crate::hash::decode_hex;
 use crate::util::read_trimmed_lines;
 use crate::{CrackError, Hasher};
 
@@ -61,14 +62,15 @@ impl HashCracker {
             return Err(CrackError::EmptyWordlist);
         }
 
+        let target = decode_hex(&self.target_hash).ok_or(CrackError::InvalidHashCharacters)?;
+
         let stats = Arc::new(CrackingStats::new());
-        let target_hash = &self.target_hash;
 
         let total_words = words.len() as u64;
         let progress_bar = self.create_progress_bar(total_words);
         let progress_bar = Arc::new(progress_bar);
 
-        let result = self.attempt_crack_parallel(&words, target_hash, &stats, &progress_bar);
+        let result = self.attempt_crack_parallel(&words, &target, &stats, &progress_bar);
 
         progress_bar.finish_with_message("Cracking completed");
 
@@ -116,7 +118,7 @@ impl HashCracker {
     fn attempt_crack_parallel(
         &self,
         words: &[Vec<u8>],
-        target_hash: &str,
+        target: &[u8],
         stats: &Arc<CrackingStats>,
         progress_bar: &Arc<ProgressBar>,
     ) -> Option<String> {
@@ -129,8 +131,7 @@ impl HashCracker {
             let mut local_count: u64 = 0;
 
             for word in chunk {
-                let computed_hash = hasher.hash(word);
-                if computed_hash.eq_ignore_ascii_case(target_hash) {
+                if hasher.hash(word).as_bytes() == target {
                     stats.add(local_count % UPDATE_INTERVAL + 1);
                     progress_bar.set_position(stats.get_attempts());
                     return Some(String::from_utf8_lossy(word).into_owned());
