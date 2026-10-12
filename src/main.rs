@@ -5,12 +5,14 @@ mod batch;
 mod cracker;
 mod display;
 mod hash;
+mod matcher;
 mod util;
 
 use batch::{CsvBatchProcessor, TxtBatchProcessor};
 use cracker::HashCracker;
 use display::Display;
-use hash::{get_hasher, Digest};
+use hash::Digest;
+use matcher::build_matcher;
 
 pub trait Hasher: Send + Sync {
     fn name(&self) -> &'static str;
@@ -26,6 +28,12 @@ pub enum CrackError {
         actual_len: usize,
     },
     InvalidHashCharacters,
+    UnknownCryptScheme(String),
+    MalformedCryptHash {
+        scheme: String,
+        reason: String,
+    },
+    AlgorithmRequiredForRawHash,
     FileNotFound(String),
     IoError(std::io::Error),
     EmptyWordlist,
@@ -61,6 +69,22 @@ impl std::fmt::Display for CrackError {
                 write!(
                     f,
                     "Invalid hash format. Hash must contain only hexadecimal characters (0-9, a-f)"
+                )
+            }
+            CrackError::UnknownCryptScheme(id) => {
+                write!(
+                    f,
+                    "Unknown crypt scheme '${}$'. Supported: $1$ (md5crypt), $5$ (sha256crypt), $6$ (sha512crypt), $2a$/$2b$/$2y$ (bcrypt), $sha1$ (sha1crypt)",
+                    id
+                )
+            }
+            CrackError::MalformedCryptHash { scheme, reason } => {
+                write!(f, "Malformed {} hash: {}", scheme, reason)
+            }
+            CrackError::AlgorithmRequiredForRawHash => {
+                write!(
+                    f,
+                    "A raw hex hash needs --algo (md5, sha1, sha256). Crypt hashes like $1$... are detected automatically"
                 )
             }
             CrackError::FileNotFound(path) => {
@@ -110,8 +134,12 @@ struct Cli {
 enum Commands {
     #[command(about = "Crack a single hash")]
     Single {
-        #[arg(short, long, help = "Hash algorithm (md5, sha1, sha256)")]
-        algo: String,
+        #[arg(
+            short,
+            long,
+            help = "Hash algorithm for a raw hex hash (md5, sha1, sha256); ignored for $id$ crypt hashes"
+        )]
+        algo: Option<String>,
 
         #[arg(short = 'H', long, help = "Target hash to crack")]
         hash: String,
@@ -211,22 +239,16 @@ fn main() {
     std::process::exit(exit_code);
 }
 
-fn run_single_mode(algo: String, hash: String, wordlist: PathBuf) -> i32 {
-    let hasher = match get_hasher(&algo) {
-        Some(hasher) => hasher,
-        None => {
-            let error = CrackError::UnsupportedAlgorithm(algo);
-            Display::print_error(&error.to_string());
+fn run_single_mode(algo: Option<String>, hash: String, wordlist: PathBuf) -> i32 {
+    let (matcher, label) = match build_matcher(&hash, algo.as_deref()) {
+        Ok(pair) => pair,
+        Err(e) => {
+            Display::print_error(&e.to_string());
             return 1;
         }
     };
 
-    if let Err(e) = HashCracker::validate_hash_format(&algo, &hash) {
-        Display::print_error(&e.to_string());
-        return 1;
-    }
-
-    let cracker = HashCracker::new(hasher, hash, wordlist);
+    let cracker = HashCracker::new(matcher, label, hash, wordlist);
 
     match cracker.crack() {
         Ok(Some(_)) => 0,

@@ -6,12 +6,13 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::display::Display;
-use crate::hash::decode_hex;
+use crate::matcher::Matcher;
 use crate::util::read_trimmed_lines;
-use crate::{CrackError, Hasher};
+use crate::CrackError;
 
 pub struct HashCracker {
-    hasher: Box<dyn Hasher>,
+    matcher: Box<dyn Matcher>,
+    label: String,
     target_hash: String,
     wordlist_path: PathBuf,
 }
@@ -43,9 +44,15 @@ impl CrackingStats {
 }
 
 impl HashCracker {
-    pub fn new(hasher: Box<dyn Hasher>, target_hash: String, wordlist_path: PathBuf) -> Self {
+    pub fn new(
+        matcher: Box<dyn Matcher>,
+        label: String,
+        target_hash: String,
+        wordlist_path: PathBuf,
+    ) -> Self {
         Self {
-            hasher,
+            matcher,
+            label,
             target_hash,
             wordlist_path,
         }
@@ -54,7 +61,7 @@ impl HashCracker {
     pub fn crack(&self) -> Result<Option<String>, CrackError> {
         self.validate_wordlist()?;
 
-        Display::print_start_info(self.hasher.name(), &self.target_hash);
+        Display::print_start_info(&self.label, &self.target_hash);
 
         let words = self.load_wordlist()?;
 
@@ -62,15 +69,13 @@ impl HashCracker {
             return Err(CrackError::EmptyWordlist);
         }
 
-        let target = decode_hex(&self.target_hash).ok_or(CrackError::InvalidHashCharacters)?;
-
         let stats = Arc::new(CrackingStats::new());
 
         let total_words = words.len() as u64;
         let progress_bar = self.create_progress_bar(total_words);
         let progress_bar = Arc::new(progress_bar);
 
-        let result = self.attempt_crack_parallel(&words, &target, &stats, &progress_bar);
+        let result = self.attempt_crack_parallel(&words, &stats, &progress_bar);
 
         progress_bar.finish_with_message("Cracking completed");
 
@@ -118,20 +123,19 @@ impl HashCracker {
     fn attempt_crack_parallel(
         &self,
         words: &[Vec<u8>],
-        target: &[u8],
         stats: &Arc<CrackingStats>,
         progress_bar: &Arc<ProgressBar>,
     ) -> Option<String> {
         const UPDATE_INTERVAL: u64 = 1000;
 
         let chunk_size = (words.len() / rayon::current_num_threads()).max(1);
-        let hasher = self.hasher.as_ref();
+        let matcher = self.matcher.as_ref();
 
         words.par_chunks(chunk_size).find_map_any(|chunk| {
             let mut local_count: u64 = 0;
 
             for word in chunk {
-                if hasher.hash(word).as_bytes() == target {
+                if matcher.matches(word) {
                     stats.add(local_count % UPDATE_INTERVAL + 1);
                     progress_bar.set_position(stats.get_attempts());
                     return Some(String::from_utf8_lossy(word).into_owned());
@@ -180,7 +184,7 @@ impl HashCracker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hash::Md5Hasher;
+    use crate::matcher::build_matcher;
     use std::fs::File;
     use std::io::Write;
     use tempfile::tempdir;
@@ -193,7 +197,8 @@ mod tests {
         file.write_all(b"hello\n\xff\xfepw\nworld\n").unwrap();
 
         let target = "cfcbbfc54cf20afe9ec1286446221bac".to_string();
-        let cracker = HashCracker::new(Box::new(Md5Hasher::new()), target, wordlist_path);
+        let (matcher, label) = build_matcher(&target, Some("md5")).unwrap();
+        let cracker = HashCracker::new(matcher, label, target, wordlist_path);
 
         assert_eq!(
             cracker.crack().unwrap(),
