@@ -17,6 +17,7 @@ A fast, multi-threaded hash cracking tool written in Rust. This tool performs di
 - **Batch CSV processing**: Crack hashes from CSV files with customizable column mapping
 - **Multi-threaded**: Leverages all CPU cores for faster cracking
 - **Multiple algorithms**: Supports MD5, SHA1, and SHA256
+- **Crypt family (single mode)**: Cracks `$id$` hashes — `$1$` md5crypt, `$5$`/`$6$` sha256/sha512crypt, `$2*$` bcrypt, `$sha1$` — detected automatically from the hash
 
 ## Usage (Local)
 
@@ -78,15 +79,23 @@ cargo run -- single -a <ALGORITHM> -H <HASH> -w <WORDLIST>
 
 | Argument | Short | Description |
 |----------|-------|-------------|
-| `--algo` | `-a` | Hash algorithm (md5, sha1, sha256) |
+| `--algo` | `-a` | Hash algorithm for a **raw hex** hash (md5, sha1, sha256). Omit for `$id$` crypt hashes, whose scheme is detected automatically |
 | `--hash` | `-H` | Target hash to crack |
 | `--wordlist` | `-w` | Path to the wordlist file |
 
-**Example:**
+**Raw hash example:**
 
 ```bash
 cargo run -- single -a md5 -H 5d41402abc4b2a76b9719d911017c592 -w wordlist.txt
 ```
+
+**Crypt hash example** (no `-a`; scheme read from the `$1$` prefix):
+
+```bash
+cargo run -- single -H '$1$p8Y6$MCdRLBzuGlfOs9S.hXOp0' -w wordlist.txt
+```
+
+> **Note:** Crypt hashes are salted and iterated (md5crypt ≈ 1000 rounds, sha512crypt ≈ 5000), so throughput is orders of magnitude lower than for raw digests — this is inherent to the scheme, not a bug. Crypt support currently covers single mode only; batch modes remain raw-digest only.
 
 ### Batch TXT Mode
 

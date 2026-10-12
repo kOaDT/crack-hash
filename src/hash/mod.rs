@@ -93,6 +93,35 @@ pub fn get_hasher(algo: &str) -> Option<Box<dyn Hasher>> {
     }
 }
 
+/// Password-hash scheme a target string belongs to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Scheme {
+    /// Bare hex digest (md5/sha1/sha256); the algorithm must be supplied.
+    Raw,
+    /// Modular Crypt Format (`$id$...`); `name` is a human-readable label.
+    Crypt { name: &'static str },
+}
+
+/// Identify a target's scheme from its shape. A leading `$` marks Modular Crypt
+/// Format, whose `$id$` selects the algorithm; anything else is a raw hex digest.
+/// Returns `None` for an MCF string whose id is not recognized.
+pub fn detect_scheme(target: &str) -> Option<Scheme> {
+    if !target.starts_with('$') {
+        return Some(Scheme::Raw);
+    }
+
+    let name = match target.split('$').nth(1)? {
+        "1" => "md5crypt",
+        "5" => "sha256crypt",
+        "6" => "sha512crypt",
+        "2a" | "2b" | "2y" => "bcrypt",
+        "sha1" => "sha1crypt",
+        _ => return None,
+    };
+
+    Some(Scheme::Crypt { name })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -166,5 +195,35 @@ mod tests {
             sha256_hasher.hash(input).to_hex(),
             "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
         );
+    }
+
+    #[test]
+    fn detect_scheme_treats_hex_as_raw() {
+        assert_eq!(
+            detect_scheme("5d41402abc4b2a76b9719d911017c592"),
+            Some(Scheme::Raw)
+        );
+    }
+
+    #[test]
+    fn detect_scheme_maps_known_crypt_ids() {
+        assert_eq!(
+            detect_scheme("$1$p8Y6$MCdRLBzuGlfOs9S.hXOp0"),
+            Some(Scheme::Crypt { name: "md5crypt" })
+        );
+        assert_eq!(
+            detect_scheme("$6$salt$digest"),
+            Some(Scheme::Crypt { name: "sha512crypt" })
+        );
+        assert_eq!(
+            detect_scheme("$2b$12$abcdefghijklmnopqrstuv"),
+            Some(Scheme::Crypt { name: "bcrypt" })
+        );
+    }
+
+    #[test]
+    fn detect_scheme_rejects_unknown_crypt_id() {
+        assert_eq!(detect_scheme("$9$salt$digest"), None);
+        assert_eq!(detect_scheme("$"), None);
     }
 }
